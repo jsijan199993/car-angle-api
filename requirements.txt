@@ -6,3 +6,4 @@ pillow
 torchvision
 scikit-learn
 python-multipart
+gdown
