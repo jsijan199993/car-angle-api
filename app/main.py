@@ -5,6 +5,8 @@ import timm
 from PIL import Image
 from torchvision import transforms
 import io
+import os
+import gdown
 
 app = FastAPI()
 
@@ -21,11 +23,28 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 CLASS_NAMES = ['back', 'front', 'left-side', 'right-side', 'tachometer', 'unknown']
 NUM_CLASSES = len(CLASS_NAMES)
 
+# model = timm.create_model('convnext_base', pretrained=False, num_classes=NUM_CLASSES)
+# model.load_state_dict(torch.load("angle_classifier_convnext.pt", map_location=DEVICE))
+# model.to(DEVICE)
+# model.eval()
+
+# https://drive.google.com/file/d/16vAuLUiL9Jy-S0eIie7oFoawDHavLZQ9/view?usp=sharing
+# 
+MODEL_PATH = "angle_classifier_convnext.pt"
+GDRIVE_ID = "16vAuLUiL9Jy-S0eIie7oFoawDHavLZQ9"
+GDRIVE_URL = f"https://drive.google.com/uc?id={GDRIVE_ID}"
+
+if not os.path.exists(MODEL_PATH):
+    print("📦 Model not found, downloading from Google Drive...")
+    gdown.download(GDRIVE_URL, MODEL_PATH, quiet=False)
+
 model = timm.create_model('convnext_base', pretrained=False, num_classes=NUM_CLASSES)
-model.load_state_dict(torch.load("angle_classifier_convnext.pt", map_location=DEVICE))
+model.load_state_dict(torch.load(MODEL_PATH, map_location=DEVICE))
 model.to(DEVICE)
 model.eval()
+print("✅ Model loaded")
 
+# 
 transform = transforms.Compose([
     transforms.Resize((224, 224)),
     transforms.ToTensor(),
