@@ -36,7 +36,7 @@ GDRIVE_URL = f"https://drive.google.com/uc?id={GDRIVE_ID}"
 
 if not os.path.exists(MODEL_PATH):
     print("📦 Model not found, downloading from Google Drive...")
-    gdown.download(GDRIVE_URL, MODEL_PATH, quiet=False)
+    gdown.download(GDRIVE_URL, MODEL_PATH, quiet=False, use_cookies=True)
 
 model = timm.create_model('convnext_base', pretrained=False, num_classes=NUM_CLASSES)
 model.load_state_dict(torch.load(MODEL_PATH, map_location=DEVICE))
