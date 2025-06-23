@@ -39,7 +39,7 @@ if not os.path.exists(MODEL_PATH):
     gdown.download(GDRIVE_URL, MODEL_PATH, quiet=False, use_cookies=True)
 
 # model = timm.create_model('convnext_base', pretrained=False, num_classes=NUM_CLASSES)
-model = timm.create_model('convnext_tiny', pretrained=False, num_classes=NUM_CLASSES)
+model = timm.create_model('convnext_base', pretrained=False, num_classes=NUM_CLASSES)
 model.load_state_dict(torch.load(MODEL_PATH, map_location=DEVICE))
 model.to(DEVICE)
 model.eval()
