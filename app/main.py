@@ -6,10 +6,10 @@ from PIL import Image
 from torchvision import transforms
 import io
 import os
+import requests
 
 app = FastAPI()
 
-# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -17,32 +17,30 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 📦 Config
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 CLASS_NAMES = ['back', 'front', 'left-side', 'right-side', 'tachometer', 'unknown']
 NUM_CLASSES = len(CLASS_NAMES)
 MODEL_PATH = "angle_classifier_convnext.pt"
-GDRIVE_ID = "16vAuLUiL9Jy-S0eIie7oFoawDHavLZQ9"
-GDRIVE_URL = f"https://drive.google.com/uc?id={GDRIVE_ID}"
+MODEL_URL = "https://huggingface.co/jsijan/car-angle-model/resolve/main/angle_classifier_convnext.pt"
 
-# Load model
+# 📦 Load model
 model = None
 try:
     if not os.path.exists(MODEL_PATH):
-        import gdown
-        print("📦 Downloading model from Google Drive...")
-        gdown.download(GDRIVE_URL, MODEL_PATH, quiet=False)
+        print("📥 Downloading model from Hugging Face...")
+        r = requests.get(MODEL_URL)
+        with open(MODEL_PATH, "wb") as f:
+            f.write(r.content)
 
-    print("🧠 Loading convnext_base...")
+    print("🧠 Loading model...")
     model = timm.create_model('convnext_base', pretrained=False, num_classes=NUM_CLASSES)
     model.load_state_dict(torch.load(MODEL_PATH, map_location=DEVICE))
     model.to(DEVICE)
     model.eval()
-    print("✅ Model loaded.")
+    print("✅ Model ready.")
 except Exception as e:
-    print(f"❌ Error loading model: {e}")
+    print(f"❌ Model loading failed: {e}")
 
-# 🔁 Transform
 transform = transforms.Compose([
     transforms.Resize((224, 224)),
     transforms.ToTensor(),
@@ -52,15 +50,15 @@ transform = transforms.Compose([
 
 @app.get("/")
 def root():
-    return {"message": "API is running", "model_loaded": model is not None}
+    return {"message": "API running", "model_loaded": model is not None}
 
 @app.post("/predict")
 async def predict(file: UploadFile = File(...)):
     if model is None:
-        return {"error": "Model not loaded."}
+        return {"error": "Model not loaded"}
 
     image_bytes = await file.read()
-    image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+    image = Image.open(io.BytesIO(image_bytes)).convert('RGB')
     input_tensor = transform(image).unsqueeze(0).to(DEVICE)
 
     with torch.no_grad():
@@ -84,48 +82,43 @@ async def predict(file: UploadFile = File(...)):
 # from torchvision import transforms
 # import io
 # import os
-# import gdown
 
 # app = FastAPI()
 
-# # CORS for React frontend
+# # CORS
 # app.add_middleware(
 #     CORSMiddleware,
-#     allow_origins=["*"],  # or restrict to your frontend URL
+#     allow_origins=["*"],
 #     allow_methods=["*"],
 #     allow_headers=["*"],
 # )
-# @app.get("/")
-# def root():
-#     return {"message": "API is running (no model loaded)"}
 
-# # # Load model
+# # 📦 Config
 # DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-# #  = ['back', 'front', 'left-side', 'right-side', 'tachometer', 'unknown']
-# # NUM_CLASSES = len()
-
-# # model = timm.create_model('convnext_base', pretrained=False, num_classes=NUM_CLASSES)
-# # model.load_state_dict(torch.load("angle_classifier_convnext.pt", map_location=DEVICE))
-# # model.to(DEVICE)
-# # model.eval()
-
-# # https://drive.google.com/file/d/16vAuLUiL9Jy-S0eIie7oFoawDHavLZQ9/view?usp=sharing
-
+# CLASS_NAMES = ['back', 'front', 'left-side', 'right-side', 'tachometer', 'unknown']
+# NUM_CLASSES = len(CLASS_NAMES)
 # MODEL_PATH = "angle_classifier_convnext.pt"
 # GDRIVE_ID = "16vAuLUiL9Jy-S0eIie7oFoawDHavLZQ9"
 # GDRIVE_URL = f"https://drive.google.com/uc?id={GDRIVE_ID}"
 
-# if not os.path.exists(MODEL_PATH):
-#     print("📦 Model not found, downloading from Google Drive...")
-#     gdown.download(GDRIVE_URL, MODEL_PATH, quiet=False, use_cookies=True)
+# # Load model
+# model = None
+# try:
+#     if not os.path.exists(MODEL_PATH):
+#         import gdown
+#         print("📦 Downloading model from Google Drive...")
+#         gdown.download(GDRIVE_URL, MODEL_PATH, quiet=False)
 
-# model = timm.create_model('convnext_base', pretrained=False, num_classes=NUM_CLASSES)
-# model.load_state_dict(torch.load(MODEL_PATH, map_location=DEVICE))
-# model.to(DEVICE)
-# model.eval()
-# print("✅ Model loaded")
+#     print("🧠 Loading convnext_base...")
+#     model = timm.create_model('convnext_base', pretrained=False, num_classes=NUM_CLASSES)
+#     model.load_state_dict(torch.load(MODEL_PATH, map_location=DEVICE))
+#     model.to(DEVICE)
+#     model.eval()
+#     print("✅ Model loaded.")
+# except Exception as e:
+#     print(f"❌ Error loading model: {e}")
 
-# # 
+# # 🔁 Transform
 # transform = transforms.Compose([
 #     transforms.Resize((224, 224)),
 #     transforms.ToTensor(),
@@ -133,10 +126,17 @@ async def predict(file: UploadFile = File(...)):
 #                          std=[0.229, 0.224, 0.225])
 # ])
 
+# @app.get("/")
+# def root():
+#     return {"message": "API is running", "model_loaded": model is not None}
+
 # @app.post("/predict")
 # async def predict(file: UploadFile = File(...)):
+#     if model is None:
+#         return {"error": "Model not loaded."}
+
 #     image_bytes = await file.read()
-#     image = Image.open(io.BytesIO(image_bytes)).convert('RGB')
+#     image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
 #     input_tensor = transform(image).unsqueeze(0).to(DEVICE)
 
 #     with torch.no_grad():
@@ -144,11 +144,87 @@ async def predict(file: UploadFile = File(...)):
 #         probs = torch.nn.functional.softmax(outputs[0], dim=0)
 
 #     top_prob, top_class = torch.max(probs, 0)
-
 #     return {
-#         "prediction": [top_class],
+#         "prediction": CLASS_NAMES[top_class],
 #         "confidence": f"{top_prob.item():.2f}",
 #         "all_confidences": {
-#             [i]: round(probs[i].item(), 4) for i in range(NUM_CLASSES)
+#             CLASS_NAMES[i]: round(probs[i].item(), 4) for i in range(NUM_CLASSES)
 #         }
 #     }
+
+# # from fastapi import FastAPI, UploadFile, File
+# # from fastapi.middleware.cors import CORSMiddleware
+# # import torch
+# # import timm
+# # from PIL import Image
+# # from torchvision import transforms
+# # import io
+# # import os
+# # import gdown
+
+# # app = FastAPI()
+
+# # # CORS for React frontend
+# # app.add_middleware(
+# #     CORSMiddleware,
+# #     allow_origins=["*"],  # or restrict to your frontend URL
+# #     allow_methods=["*"],
+# #     allow_headers=["*"],
+# # )
+# # @app.get("/")
+# # def root():
+# #     return {"message": "API is running (no model loaded)"}
+
+# # # # Load model
+# # DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# # #  = ['back', 'front', 'left-side', 'right-side', 'tachometer', 'unknown']
+# # # NUM_CLASSES = len()
+
+# # # model = timm.create_model('convnext_base', pretrained=False, num_classes=NUM_CLASSES)
+# # # model.load_state_dict(torch.load("angle_classifier_convnext.pt", map_location=DEVICE))
+# # # model.to(DEVICE)
+# # # model.eval()
+
+# # # https://drive.google.com/file/d/16vAuLUiL9Jy-S0eIie7oFoawDHavLZQ9/view?usp=sharing
+
+# # MODEL_PATH = "angle_classifier_convnext.pt"
+# # GDRIVE_ID = "16vAuLUiL9Jy-S0eIie7oFoawDHavLZQ9"
+# # GDRIVE_URL = f"https://drive.google.com/uc?id={GDRIVE_ID}"
+
+# # if not os.path.exists(MODEL_PATH):
+# #     print("📦 Model not found, downloading from Google Drive...")
+# #     gdown.download(GDRIVE_URL, MODEL_PATH, quiet=False, use_cookies=True)
+
+# # model = timm.create_model('convnext_base', pretrained=False, num_classes=NUM_CLASSES)
+# # model.load_state_dict(torch.load(MODEL_PATH, map_location=DEVICE))
+# # model.to(DEVICE)
+# # model.eval()
+# # print("✅ Model loaded")
+
+# # # 
+# # transform = transforms.Compose([
+# #     transforms.Resize((224, 224)),
+# #     transforms.ToTensor(),
+# #     transforms.Normalize(mean=[0.485, 0.456, 0.406],
+# #                          std=[0.229, 0.224, 0.225])
+# # ])
+
+# # @app.post("/predict")
+# # async def predict(file: UploadFile = File(...)):
+# #     image_bytes = await file.read()
+# #     image = Image.open(io.BytesIO(image_bytes)).convert('RGB')
+# #     input_tensor = transform(image).unsqueeze(0).to(DEVICE)
+
+# #     with torch.no_grad():
+# #         outputs = model(input_tensor)
+# #         probs = torch.nn.functional.softmax(outputs[0], dim=0)
+
+# #     top_prob, top_class = torch.max(probs, 0)
+
+# #     return {
+# #         "prediction": [top_class],
+# #         "confidence": f"{top_prob.item():.2f}",
+# #         "all_confidences": {
+# #             [i]: round(probs[i].item(), 4) for i in range(NUM_CLASSES)
+# #         }
+# #     }
